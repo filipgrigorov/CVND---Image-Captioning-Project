@@ -74,7 +74,7 @@ class DecoderRNN(nn.Module):
         self.fc = nn.Linear(in_features=self.hidden_size, out_features=self.vocab_size)
     
     def init_hidden(self, batch_size):
-        self.hidden = (torch.zeros((self.n_layers, batch_size, self.hidden_size), device=torch.device("cuda" if torch.cuda.is_available() else "cpu")), torch.zeros((self.n_layers, batch_size, self.hidden_size), device=torch.device("cuda" if torch.cuda.is_available() else "cpu")))
+        return (torch.zeros((self.n_layers, batch_size, self.hidden_size), device=torch.device("cuda" if torch.cuda.is_available() else "cpu")), torch.zeros((self.n_layers, batch_size, self.hidden_size), device=torch.device("cuda" if torch.cuda.is_available() else "cpu")))
     
     # Note: features shape: [batch_size x embed_size]
     # Note: captions shape: [batch_size x seq_len]
@@ -87,7 +87,7 @@ class DecoderRNN(nn.Module):
         #first_token, hidden = self.lstm(features.view(batch_size, 1, features.size(1)), self.hidden)
         features = features.view(batch_size, 1, features.size(1))
         
-        # Note: We need to feed in the n - 1 data, as we are predicting the n data
+        # Note: input: data[: n - 1] and predictions are data[1 : n] (Shifted by 1)
         embeds = self.embedding(captions[:, :-1])
         
         combined = torch.cat((features, embeds), dim=1)
@@ -105,31 +105,32 @@ class DecoderRNN(nn.Module):
 
     def sample(self, features, states=None, max_len=20):
         " accepts pre-processed image tensor (inputs) and returns predicted sentence (list of tensor ids of length max_len) "
-        self.init_hidden(features.size(0))
+        #(1) Predict the first word index
+        output, states = self.lstm(features)
+        output_probs = self.fc(output)
         
-        # Note: Predict the first word index
-        output, hidden = self.lstm(features, self.hidden)
-        probs = self.fc(output)
-        
-        # Note: Grab maximum index for most probable word
-        values, max_i = torch.max(probs, dim=2)
+        #(2) Get the most probable index of the whole vocabulary-sized output vector
+        i_values, max_i = torch.max(output_probs, dim=2)
         idx = max_i.item()
-        captions = [idx]
+        sentence = [idx]
         
         counter = 1
         while tokens['<end>'] != idx and counter <= max_len:
-            embed = self.embedding(values.long())
+            #(3) Feed the predicted index to predict the next one
+            previous_word = torch.tensor(sentence[-1], device=torch.device("cuda" if torch.cuda.is_available() else "cpu")).long().view(features.size(0), 1)
+            embed = self.embedding(previous_word)
             
-            output, hidden = self.lstm(embed, hidden)
+            output, states = self.lstm(embed, states)
+            output_probs = self.fc(output)
             
             # Note: Get next word index
-            values, max_i = torch.max(output, dim=2)
+            i_values, max_i = torch.max(output_probs, dim=2)
             idx = max_i.item()
-            captions.append(idx)
+            sentence.append(idx)
             
             counter += 1
         
-        return captions
+        return sentence
     
 if __name__ == '__main__':
     encoder = EncoderCNN(embed_size=256)

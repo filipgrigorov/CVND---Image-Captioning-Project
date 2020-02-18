@@ -10,6 +10,19 @@ from tqdm import tqdm
 import random
 import json
 
+#backup
+old_train_img_folder = 'cocoapi/images/train2014/'
+old_train_annots_folder = 'cocoapi/annotations/captions_train2014.json'
+
+old_test_img_folder = 'cocoapi/images/test2014/'
+old_test_annots_folder = 'cocoapi/annotations/image_info_test2014.json'
+
+train_imgs_dir = '/train2014/'
+train_annots_dir = '/train/annotations/captions_train2014.json'
+
+test_imgs_dir = '/test2014/'
+test_annots_dir = '/test/annotations/image_info_test2014.json'
+
 def get_loader(transform,
                mode='train',
                batch_size=1,
@@ -43,14 +56,21 @@ def get_loader(transform,
     # Based on mode (train, val, test), obtain img_folder and annotations_file.
     if mode == 'train':
         if vocab_from_file==True: assert os.path.exists(vocab_file), "vocab_file does not exist.  Change vocab_from_file to False to create vocab_file."
-        img_folder = os.path.join(cocoapi_loc, 'cocoapi/images/train2014/')
-        annotations_file = os.path.join(cocoapi_loc, 'cocoapi/annotations/captions_train2014.json')
+        img_folder = os.getcwd()
+        img_folder += cocoapi_loc + train_imgs_dir
+
+        annotations_file = os.getcwd()
+        annotations_file += cocoapi_loc + train_annots_dir
+
     if mode == 'test':
         assert batch_size==1, "Please change batch_size to 1 if testing your model."
         assert os.path.exists(vocab_file), "Must first generate vocab.pkl from training data."
         assert vocab_from_file==True, "Change vocab_from_file to True."
-        img_folder = os.path.join(cocoapi_loc, 'cocoapi/images/test2014/')
-        annotations_file = os.path.join(cocoapi_loc, 'cocoapi/annotations/image_info_test2014.json')
+        img_folder = os.getcwd()
+        img_folder += cocoapi_loc + test_imgs_dir
+
+        annotations_file = os.getcwd()
+        annotations_file += cocoapi_loc + test_annots_dir
 
     # COCO caption dataset.
     dataset = CoCoDataset(transform=transform,
